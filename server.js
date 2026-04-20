@@ -90,5 +90,64 @@ app.post("/unlock", (req, res) => {
 
 app.get("/", (req, res) => res.send("StudyFlow API is running."));
 
+// Admin dashboard — password protected
+app.get("/admin", (req, res) => {
+  const { password } = req.query;
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).send("Unauthorized");
+  }
+  const users = db.prepare("SELECT * FROM users ORDER BY created_at DESC").all();
+  const totalUsers = users.length;
+  const proUsers = users.filter(u => u.is_pro).length;
+  const freeUsers = totalUsers - proUsers;
+  const rows = users.map(u => `
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:10px 16px;">${u.email}</td>
+      <td style="padding:10px 16px;text-align:center;">${u.uses}</td>
+      <td style="padding:10px 16px;text-align:center;">
+        <span style="padding:3px 10px;border-radius:100px;font-size:12px;font-weight:600;${u.is_pro ? 'background:#e8f4ee;color:#2d6a4f;' : 'background:#f5e8e4;color:#c84b2f;'}">
+          ${u.is_pro ? 'Pro' : 'Free'}
+        </span>
+      </td>
+      <td style="padding:10px 16px;color:#8c867d;font-size:13px;">${u.created_at}</td>
+    </tr>`).join('');
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>StudyFlow Admin</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body { font-family: sans-serif; background: #f7f4ee; margin: 0; padding: 2rem; }
+        h1 { font-size: 24px; margin-bottom: 4px; }
+        .subtitle { color: #8c867d; font-size: 14px; margin-bottom: 2rem; }
+        .stats { display: flex; gap: 16px; margin-bottom: 2rem; flex-wrap: wrap; }
+        .stat { background: #fff; border: 1px solid #e0ddd6; border-radius: 12px; padding: 1rem 1.5rem; min-width: 120px; }
+        .stat-num { font-size: 28px; font-weight: 600; }
+        .stat-label { font-size: 12px; color: #8c867d; text-transform: uppercase; letter-spacing: 0.06em; }
+        table { width: 100%; background: #fff; border-radius: 12px; border-collapse: collapse; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        th { text-align: left; padding: 12px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #8c867d; border-bottom: 2px solid #eee; }
+        tr:hover { background: #fafaf8; }
+      </style>
+    </head>
+    <body>
+      <h1>&#x2022; StudyFlow Admin</h1>
+      <p class="subtitle">User dashboard</p>
+      <div class="stats">
+        <div class="stat"><div class="stat-num">${totalUsers}</div><div class="stat-label">Total users</div></div>
+        <div class="stat"><div class="stat-num" style="color:#2d6a4f;">${proUsers}</div><div class="stat-label">Pro users</div></div>
+        <div class="stat"><div class="stat-num" style="color:#c84b2f;">${freeUsers}</div><div class="stat-label">Free users</div></div>
+        <div class="stat"><div class="stat-num" style="color:#1e4d8c;">$${proUsers * 9}</div><div class="stat-label">Est. MRR</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Email</th><th style="text-align:center;">Uses</th><th style="text-align:center;">Plan</th><th>Signed up</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" style="padding:2rem;text-align:center;color:#8c867d;">No users yet</td></tr>'}</tbody>
+      </table>
+    </body>
+    </html>
+  `);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
